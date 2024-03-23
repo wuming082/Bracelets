@@ -10,12 +10,16 @@ dreamsky.0822.wuming
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
+////////////////////////////////////////////Test///////////////////
+//建立服务端TCP监听接口
+WiFiServer server(822);//监听接口为822
+//////////////////////////////////////////////Test/////////////////
 //注册WIFI连接成功事件处理程序
 WiFiEventHandler STAconnect;
 //注册WIFI连接断开事件处理程序
 WiFiEventHandler STAdiconnect;
 //服务端相应防火墙/AP点配置
-IPAddress local_IP(192,168,2,208);//本身的IP地址
+IPAddress local_IP(192,168,2,1);//本身的IP地址
 IPAddress getway(192,168,2,1);
 IPAddress subnet(225,225,225,0);
 //灯光闪烁函数(闪一次)
@@ -136,6 +140,18 @@ void IPfunction(){
   Serial.println(WiFi.localIP());
 }
 void loop() {
+  //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
+  WiFiClient client = server.available();//监听客户端连接
+  if(client){//如果有客户端连接
+    Serial.println("new connected!");
+    String transfer = "";//接收数据包变量
+    Serial.printf("h");
+    if(client.available()){
+      transfer = client.read();
+      Serial.println(transfer);
+      transfer = "";
+    }
+  }
 }
 //STA连接wifi回调函数
 void connectHelper(const WiFiEventStationModeConnected &event){
