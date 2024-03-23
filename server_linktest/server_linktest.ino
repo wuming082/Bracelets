@@ -6,6 +6,7 @@
 测试文件2024/3.23/10:27
 **********************************************************************************
 dreamsky.0822.wuming
+服务端调试测试am
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
@@ -13,6 +14,10 @@ dreamsky.0822.wuming
 WiFiEventHandler STAconnect;
 //注册WIFI连接断开事件处理程序
 WiFiEventHandler STAdiconnect;
+//服务端相应防火墙/AP点配置
+IPAddress local_IP(192,168,2,208);//本身的IP地址
+IPAddress getway(192,168,2,1);
+IPAddress subnet(225,225,225,0);
 //灯光闪烁函数(闪一次)
 void lighthelper(int Num,int Sce){//Num为次数,sce为间隔时间（毫秒）
   for(int i = 0 ; i< Num ; i++){
@@ -50,13 +55,16 @@ void linkserverFunction(){
 //APWIFI模式功能
 class APWIFI{//默认情况下为隐藏式WIFI
   public :static void APopen(){//默认接入4台设备
+    WiFi.softAPConfig(local_IP, getway, subnet);
     WiFi.softAP(ssid,password,1,1);//默认隐藏WIFI
   }
   public :static void APopen(int option){//设定option为0的时候为可搜索wifi
+    WiFi.softAPConfig(local_IP, getway, subnet);
     WiFi.softAP(ssid,password,1,option);
   }
 };
 //注册网络设备接入连接事件处理程序1
+WiFiEventHandler APlinkfunction;
 //AP和STA模式切换函数//默认为STA模式
 class switchTrans {
   //创建默认模式切换方法
@@ -90,7 +98,7 @@ class switchTrans {
         Serial.printf("\nWIFI可搜索模式已开启(调试模式)\nWIFI名称: %s 密码: %s",ssid,password);
       }else if(optionWIFI == 1){
         APWIFI::APopen(optionWIFI);
-        Serial.printf("隐藏式网络(工作模式)\nWIFI名称: %s 密码: %s",ssid,password);
+        Serial.printf("\n隐藏式网络(工作模式)\nWIFI名称: %s 密码: %s",ssid,password);
       }else
         Serial.println("switchMode(option,optionWIFI)_err,optionWIFI参数传参错误,1为隐藏式网络，0为可搜索网络，检查传参参数是否正确");
     }else{
@@ -109,9 +117,10 @@ void setup() {
   Serial.begin(115200);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
+  APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
   //test
-  //STA模式开启
-  switchTrans::switchMode();
+  //AP模式开启
+  switchTrans::switchMode(1,1);
   //test
   //switchTrans::switchMode(1,1);
   //test
@@ -130,7 +139,7 @@ void loop() {
 }
 //STA连接wifi回调函数
 void connectHelper(const WiFiEventStationModeConnected &event){
-  Serial.printf("\n已连接至 %s ！\n",ssid);
+  Serial.printf("\n\n已连接至 %s ！\n",ssid);
   digitalWrite(D4,HIGH);
 }
 //STA断开wifi回调函数
@@ -139,4 +148,10 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
   digitalWrite(D4,LOW);
   //linkserverFunction();
+}
+//ap模式有新的设备加入
+void APlinkHelper(const WiFiEventSoftAPModeStationConnected& event){
+  //报告状况
+  Serial.printf("\n有设备加入！，设备的的IP地址为 ");
+  Serial.println(WiFi.softAPIP());
 }
