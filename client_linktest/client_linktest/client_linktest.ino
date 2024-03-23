@@ -2,6 +2,7 @@
 #include<stdio.h>
 #define ssid "Texthome"//目标名称
 #define password "WZP8460121"//密码
+#define hostA "192.168.2.1"
 /*
 测试文件2024/3.23/10:27
 **********************************************************************************
@@ -10,6 +11,11 @@ dreamsky.0822.wuming
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
+//定义网络TCP包传输端口
+const uint16_t port = 822;//AP模式的监听端口
+const char* host = "192.168.2.1";//TCP服务器ip
+//实例化网络客户端对象
+WiFiClient client;
 //注册WIFI连接成功事件处理程序
 WiFiEventHandler STAconnect;
 //注册WIFI连接断开事件处理程序
@@ -23,6 +29,15 @@ void lighthelper(int Num,int Sce){//Num为次数,sce为间隔时间（毫秒）
     delay(Sce);
   }
 }
+//进行TCP握手/////////////////////////////////////////Test/////////////////////
+void TCPlinkfunction(){
+  
+  if(!client.connect(host,port)){
+    Serial.println("err!,连接错误！");
+    return;
+  }
+}
+//////////////////////////////////////////////////////Test////////////////////
 //提示灯函数///
 void lightLEDinf(int option){//传入1为正常情况快三闪，传入0为发生错误，多次慢四闪
   if(option == 1){
@@ -114,6 +129,13 @@ void setup() {
   //test
   //STA模式开启
   switchTrans::switchMode();
+  client.connect(host,port);
+  Serial.printf("\n正在TCP连接IP：");
+  Serial.println(host);
+  if (!client.connect(host,port)){
+    Serial.println("Connection failed");
+    return;
+  }
   //test
   //switchTrans::switchMode(1,1);
   //test
@@ -129,6 +151,9 @@ void IPfunction(){
   Serial.println(WiFi.localIP());
 }
 void loop() {
+  if(client.connected()){////////////////////////////////////测试发送客户端IP地址////////////////////
+    client.println(WiFi.localIP());
+  }
 }
 //STA连接wifi回调函数
 void connectHelper(const WiFiEventStationModeConnected &event){
