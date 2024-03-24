@@ -1,6 +1,6 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
-#define ssid "Texthome"//目标名称
+#define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
 /*
 测试文件2024/3.23/10:27
@@ -12,16 +12,16 @@ dreamsky.0822.wuming
 */
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
-WiFiServer server(822);//监听接口为822
+WiFiServer server(80);//监听接口为80
 //////////////////////////////////////////////Test/////////////////
 //注册WIFI连接成功事件处理程序
 WiFiEventHandler STAconnect;
 //注册WIFI连接断开事件处理程序
 WiFiEventHandler STAdiconnect;
 //服务端相应防火墙/AP点配置
-IPAddress local_IP(192,168,2,1);//本身的IP地址
-IPAddress getway(192,168,2,1);
-IPAddress subnet(225,225,225,0);
+//IPAddress local_IP(192,168,2,1);//本身的IP地址
+//IPAddress getway(192,168,2,1);
+//IPAddress subnet(225,225,225,0);
 //灯光闪烁函数(闪一次)
 void lighthelper(int Num,int Sce){//Num为次数,sce为间隔时间（毫秒）
   for(int i = 0 ; i< Num ; i++){
@@ -59,11 +59,11 @@ void linkserverFunction(){
 //APWIFI模式功能
 class APWIFI{//默认情况下为隐藏式WIFI
   public :static void APopen(){//默认接入4台设备
-    WiFi.softAPConfig(local_IP, getway, subnet);
+    //WiFi.softAPConfig(local_IP, getway, subnet);
     WiFi.softAP(ssid,password,1,1);//默认隐藏WIFI
   }
   public :static void APopen(int option){//设定option为0的时候为可搜索wifi
-    WiFi.softAPConfig(local_IP, getway, subnet);
+    //WiFi.softAPConfig(local_IP, getway, subnet);
     WiFi.softAP(ssid,password,1,option);
   }
 };
@@ -113,7 +113,7 @@ class switchTrans {
 
 //串口程序函数4
 //目标设备丢失事件处理程序（需要通过MAC地址判断是否为目标设备）
-
+WiFiClient client = server.available();//监听客户端连接
 void setup() {
   pinMode(D4,OUTPUT);
   digitalWrite(D4,HIGH);
@@ -121,14 +121,28 @@ void setup() {
   Serial.begin(115200);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
-  APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
+  //APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
   //test
-  //AP模式开启
+  //STA模式开启
   switchTrans::switchMode(1,1);
+  //开启TCP服务器
+  server.begin();
+  Serial.println("\nserver_start");
+  //检测端口
+  Serial.printf("端口为：%d\n",80);
+  Serial.println(WiFi.softAPIP());
   //test
   //switchTrans::switchMode(1,1);
   //test
-  
+  Serial.println("等待设备加入");
+
+  while(WiFi.softAPgetStationNum() != 1){//检测机制////////////////////////////////
+    Serial.print(".");
+    delay(300);
+  } 
+  Serial.print("有设备的加入！\n开始验证");
+  //Serial.println(IPcilent);
+
   //lightLEDinf(1);
   //delay(10000);
   //lightLEDinf(0);
@@ -138,21 +152,70 @@ void setup() {
 void IPfunction(){
   Serial.printf("\n目前ip地址为： ");
   Serial.println(WiFi.localIP());
+
 }
+//测试连接性函数
+void testLinkfunction(){
+  
+}
+int Numcount = 0;
+String clientData;
 void loop() {
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
   WiFiClient client = server.available();//监听客户端连接
-  if(client){//如果有客户端连接
-    Serial.println("new connected!");
-    String transfer = "";//接收数据包变量
-    Serial.printf("h");
+  //判断用户有没有进行输入
+  //判断设备是否断开连接
+    /*
     if(client.available()){
-      transfer = client.read();
-      Serial.println(transfer);
-      transfer = "";
+      if(client.read() != '.'){
+        clientData = client.readStringUntil('\n');
+        Serial.printf("\n连接成功！此设备的IP地址为：");
+        Serial.println(clientData);
+      }
     }
+    */
+    //测试连接性回复包
+    delay(1000);
+    client.printf("dream\n");
+    clientData = client.readStringUntil('\n');
+    if(clientData == "sky"){
+      Serial.println("回复成功");
+    }
+    else{
+      Serial.println("未回复，连接失败！");
+    }
+    Serial.println(clientData);
+    //clientData = "";
   }
-}
+
+/*
+    while (WiFi.softAPgetStationNum() != 0) {
+      if (client.available()) {
+        // 读取数据
+        if(Numcount == 0){
+          String clientData;
+          clientData = client.readStringUntil('\n');
+          Serial.printf("\n连接成功！此设备的IP地址为：");
+          Serial.println(clientData);
+          Numcount++;
+        }
+        char option = client.read();
+        if(option == 'A' || option == 'V'){
+          lighthelper(2,300);
+        }
+        Serial.println(option);
+      }
+    } 
+    if(1 != WiFi.softAPgetStationNum()){
+      Numcount == 0;
+      Serial.printf("\n设备断开连接！\n正在重连");
+      while(1 != WiFi.softAPgetStationNum()){
+        Serial.printf(".");
+        delay(300);
+      }
+      Serial.println("重连成功！");
+    }
+*/
 //STA连接wifi回调函数
 void connectHelper(const WiFiEventStationModeConnected &event){
   Serial.printf("\n\n已连接至 %s ！\n",ssid);
@@ -166,8 +229,10 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   //linkserverFunction();
 }
 //ap模式有新的设备加入
+/*
 void APlinkHelper(const WiFiEventSoftAPModeStationConnected& event){
   //报告状况
   Serial.printf("\n有设备加入！，设备的的IP地址为 ");
   Serial.println(WiFi.softAPIP());
 }
+*/
