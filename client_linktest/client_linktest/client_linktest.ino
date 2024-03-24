@@ -1,6 +1,6 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
-#define ssid "Texthome"//目标名称
+#define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
 #define hostA "192.168.2.1"
 /*
@@ -12,8 +12,8 @@ dreamsky.0822.wuming
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
 //定义网络TCP包传输端口
-const uint16_t port = 822;//AP模式的监听端口
-const char* host = "192.168.2.1";//TCP服务器ip
+const uint16_t port = 80;//AP模式的监听端口
+const char* host = "192.168.4.1";//TCP服务器ip
 //实例化网络客户端对象
 WiFiClient client;
 //注册WIFI连接成功事件处理程序
@@ -118,10 +118,11 @@ class switchTrans {
 
 //串口程序函数4
 //目标设备丢失事件处理程序（需要通过MAC地址判断是否为目标设备）
-
+int count = 0;//记录是否断开过wifi连接
 void setup() {
   pinMode(D4,OUTPUT);
   digitalWrite(D4,HIGH);
+  WiFi.setAutoReconnect(false);
   //设定通信串口为9600
   Serial.begin(9600);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
@@ -134,7 +135,6 @@ void setup() {
   Serial.println(host);
   if (!client.connect(host,port)){
     Serial.println("Connection failed");
-    return;
   }
   //test
   //switchTrans::switchMode(1,1);
@@ -144,16 +144,31 @@ void setup() {
   //delay(10000);
   //lightLEDinf(0);
   //lightLEDinf(3);
+  WiFi.begin(ssid,password);
+  client.println(WiFi.localIP());
 }
 //报告IP函数
 void IPfunction(){
   Serial.printf("\n目前ip地址为： ");
   Serial.println(WiFi.localIP());
 }
+String transfer;
 void loop() {
-  if(client.connected()){////////////////////////////////////测试发送客户端IP地址////////////////////
-    client.println(WiFi.localIP());
+ ////////////////////////////////////测试发送客户端IP地址////////////////////
+  //client.printf("A");
+  //if(count == 0){
+  //  WiFi.begin(ssid,password);
+  //  client.println(WiFi.localIP());
+  //  count++;
+  //}
+  //读取指令
+  transfer = client.readStringUntil('\n');
+  if(transfer == "dream"){
+    client.printf("sky\n");
   }
+  Serial.println(transfer);
+  //transfer ="";
+  //client.printf(".");
 }
 //STA连接wifi回调函数
 void connectHelper(const WiFiEventStationModeConnected &event){
@@ -165,5 +180,6 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   //报告状况
   Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
   digitalWrite(D4,LOW);
+  count = 0;
   //linkserverFunction();
 }
