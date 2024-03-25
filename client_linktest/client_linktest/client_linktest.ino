@@ -119,7 +119,7 @@ class switchTrans {
   }
 };
 //发送检测数据包.检测函数
-int checkpakeage(){
+int checkpakeage(){/////////////////////////err////////////////////////
   Udp.beginPacket("192.168.4.1",822);
   char  replyPacket[] = "Hi, this is esp8266\n";
   Udp.write(replyPacket);
@@ -156,10 +156,11 @@ void setup() {
     Serial.printf("开启失败！");
   }
 }
+int Numcount = 0;//重新计算链接次数，用于判断是否进行UDP测试互发包
 void loop() {
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
-  if(count == 0){
+  if(Numcount == 0){
     delay(1500);
     Udp.beginPacket("192.168.4.1",822);
     Udp.write(WiFi.macAddress().c_str());
@@ -176,8 +177,8 @@ void loop() {
     }
     input = 0;
     if(Udp.readString() = "pass"){
-      Serial.printf("测试成功");
-      count++;
+      Serial.printf("UDP协议重连成功！");
+      Numcount++;
     }
   }///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
@@ -196,14 +197,13 @@ void loop() {
 void connectHelper(const WiFiEventStationModeConnected &event){
   Serial.printf("\n\n已连接至 %s ！\n",ssid);
   digitalWrite(D4,HIGH);
-  count = 0;//恢复设置，重新开始计数
 }
 //STA断开wifi回调函数
 void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   //报告状况
   Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
   digitalWrite(D4,LOW);
-  
+  Numcount = 0;//恢复设置，重新开始计数
   //linkserverFunction();
 }
 /*
