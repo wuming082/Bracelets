@@ -74,6 +74,8 @@ class APWIFI{//默认情况下为隐藏式WIFI
 };
 //注册网络设备接入连接事件处理程序1
 WiFiEventHandler APlinkfunction;
+//注册有连接点断开的处理程序
+WiFiEventHandler stationDisconnectedHandler;
 //AP和STA模式切换函数//默认为STA模式
 class switchTrans {
   //创建默认模式切换方法
@@ -126,6 +128,7 @@ void setup() {
   Serial.begin(115200);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
+  stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
   //APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
   //test
   //STA模式开启
@@ -145,7 +148,7 @@ void setup() {
   //开启UDP监听端口
   if(Udp.begin(localUdpPort)){
     Serial.println("UDP协议监听端口开启成功！");
-    Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.localIP().toString().c_str());
+    Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.softAPIP().toString().c_str());
   }else{
     Serial.printf("开启失败！");
   }
@@ -160,6 +163,7 @@ void loop() {
   {
     //收到Udp数据包
     //Udp.remoteIP().toString().c_str()用于将获取的远端IP地址转化为字符串
+    /*
     Serial.printf("收到来自远程IP：%s（远程端口：%d）的数据包字节数：%d\n", Udp.remoteIP().toString().c_str(), Udp.remotePort(), packetSize);
     char incomingPacket[255];
     // 读取Udp数据包并存放在incomingPacket
@@ -168,8 +172,10 @@ void loop() {
     { 
       incomingPacket[len] = 0;//清空缓存
     }
+    */
+    Serial.printf("\ntest");
     //向串口打印信息
-    Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
+    //Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
  
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
   //WiFiClient client = server.available();//监听客户端连接
@@ -186,15 +192,18 @@ void loop() {
     */
   }
   /////////////////////////////////////UDP测试互发包//////////////////////////
-  Udp.parsePacket();
-  if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
-    Serial.printf("true");
-    delay(2000);
-    Udp.beginPacket("192.168.4.2",822);
-    char  replyPacket[] = "pass";
-    Udp.write(replyPacket);
-    Udp.endPacket();//
-    Numcount++;
+  if(Numcount == 0){
+    Udp.parsePacket();
+    if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
+      Serial.printf("true");
+      delay(2000);
+      Udp.beginPacket("192.168.4.2",822);
+      char  replyPacket[] = "pass";
+      Udp.write(replyPacket);
+      Udp.endPacket();//
+      Numcount++;
+      Serial.printf("\nUDP连接成功！");
+    }
   }
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
@@ -237,6 +246,11 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
   digitalWrite(D4,LOW);
   //linkserverFunction();
+}
+void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt){
+  //链接丢失提醒
+  Serial.printf("\n目标链接丢失！");
+  Numcount--;
 }
 //ap模式有新的设备加入
 /*
