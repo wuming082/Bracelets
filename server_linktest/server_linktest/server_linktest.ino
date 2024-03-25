@@ -1,5 +1,8 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
+#include <Pinger.h>
+#include <WiFiUdp.h>
+
 #define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
 /*
@@ -10,6 +13,8 @@ dreamsky.0822.wuming
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
+WiFiUDP Udp;//实例化UDP对象
+
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
 WiFiServer server(80);//监听接口为80
@@ -126,43 +131,48 @@ void setup() {
   //STA模式开启
   switchTrans::switchMode(1,1);
   //开启TCP服务器
-  server.begin();
-  Serial.println("\nserver_start");
+  //server.begin();
+  //Serial.println("\nserver_start");
   //检测端口
-  Serial.printf("端口为：%d\n",80);
-  Serial.println(WiFi.softAPIP());
+  //Serial.printf("端口为：%d\n",80);
+  //Serial.println(WiFi.softAPIP());
   //test
   //switchTrans::switchMode(1,1);
   //test
-  Serial.println("等待设备加入");
-
-  while(WiFi.softAPgetStationNum() != 1){//检测机制////////////////////////////////
-    Serial.print(".");
-    delay(300);
-  } 
-  Serial.print("有设备的加入！\n开始验证");
-  //Serial.println(IPcilent);
-
-  //lightLEDinf(1);
-  //delay(10000);
-  //lightLEDinf(0);
-  //lightLEDinf(3);
+  //Serial.println("等待设备加入");
+  //设置监听端口
+  unsigned int localUdpPort = 822;
+  //开启UDP监听端口
+  if(Udp.begin(localUdpPort)){
+    Serial.println("UDP协议监听端口开启成功！");
+    Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.localIP().toString().c_str());
+  }else{
+    Serial.printf("开启失败！");
+  }
+  //检测机制////////////////////////////////
+  //检测是否为相应mac地址的设备加入
 }
-//报告IP函数
-void IPfunction(){
-  Serial.printf("\n目前ip地址为： ");
-  Serial.println(WiFi.localIP());
-
-}
-//测试连接性函数
-void testLinkfunction(){
-  
-}
+//记录设备连接状况
 int Numcount = 0;
-String clientData;
 void loop() {
+  int packetSize = Udp.parsePacket();//获得解析包
+  if (packetSize && Udp.readString() == "84:CC:A8:9E:E4:C8")//解析包不为空且解析包不能单独发送MAC码
+  {
+    //收到Udp数据包
+    //Udp.remoteIP().toString().c_str()用于将获取的远端IP地址转化为字符串
+    Serial.printf("收到来自远程IP：%s（远程端口：%d）的数据包字节数：%d\n", Udp.remoteIP().toString().c_str(), Udp.remotePort(), packetSize);
+    char incomingPacket[255];
+    // 读取Udp数据包并存放在incomingPacket
+    int len = Udp.read(incomingPacket, 255);//返回数据包字节数
+    if (len > 0)
+    { 
+      incomingPacket[len] = 0;//清空缓存
+    }
+    //向串口打印信息
+    Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
+ 
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
-  WiFiClient client = server.available();//监听客户端连接
+  //WiFiClient client = server.available();//监听客户端连接
   //判断用户有没有进行输入
   //判断设备是否断开连接
     /*
@@ -174,20 +184,20 @@ void loop() {
       }
     }
     */
-    //测试连接性回复包
-    delay(1000);
-    client.printf("dream\n");
-    clientData = client.readStringUntil('\n');
-    if(clientData == "sky"){
-      Serial.println("回复成功");
-    }
-    else{
-      Serial.println("未回复，连接失败！");
-    }
-    Serial.println(clientData);
-    //clientData = "";
   }
-
+  /////////////////////////////////////UDP测试互发包//////////////////////////
+  Udp.parsePacket();
+  if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
+    Serial.printf("true");
+    delay(2000);
+    Udp.beginPacket("192.168.4.2",822);
+    char  replyPacket[] = "pass";
+    Udp.write(replyPacket);
+    Udp.endPacket();//
+    Numcount++;
+  }
+  /////////////////////////////////////UDP测试互发包//////////////////////////
+}
 /*
     while (WiFi.softAPgetStationNum() != 0) {
       if (client.available()) {
