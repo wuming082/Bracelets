@@ -1,5 +1,7 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
+#include <WiFiUdp.h>
+
 #define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
 #define hostA "192.168.2.1"
@@ -11,9 +13,10 @@ dreamsky.0822.wuming
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
+WiFiUDP Udp;//实例化UDP对象
 //定义网络TCP包传输端口
 const uint16_t port = 80;//AP模式的监听端口
-const char* host = "192.168.4.1";//TCP服务器ip
+char* host = "192.168.4.1";//TCP服务器ip
 //实例化网络客户端对象
 WiFiClient client;
 //注册WIFI连接成功事件处理程序
@@ -115,14 +118,27 @@ class switchTrans {
     }
   }
 };
+//发送检测数据包.检测函数
+int checkpakeage(){
+  Udp.beginPacket("192.168.4.1",822);
+  char  replyPacket[] = "Hi, this is esp8266\n";
+  Udp.write(replyPacket);
+  Udp.endPacket();//
+  //进行回复检测
+  int input = Udp.parsePacket();//解包
+  if(Udp.readString() == "pass"){
+    Serial.printf("连接成功！");
+  }
 
+}
+unsigned int localUdpPort = 822;
 //串口程序函数4
 //目标设备丢失事件处理程序（需要通过MAC地址判断是否为目标设备）
 int count = 0;//记录是否断开过wifi连接
 void setup() {
   pinMode(D4,OUTPUT);
   digitalWrite(D4,HIGH);
-  WiFi.setAutoReconnect(false);
+  //WiFi.setAutoReconnect(false);
   //设定通信串口为9600
   Serial.begin(9600);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
@@ -130,7 +146,68 @@ void setup() {
   //test
   //STA模式开启
   switchTrans::switchMode();
-  client.connect(host,port);
+  //设置监听端口
+  
+  //开启UDP监听端口
+  if(Udp.begin(localUdpPort)){
+    Serial.println("UDP协议监听端口开启成功！");
+    Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.localIP().toString().c_str());
+  }else{
+    Serial.printf("开启失败！");
+  }
+}
+void loop() {
+  /////////////////////////////////////UDP测试互发包//////////////////////////
+  ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
+  if(count == 0){
+    delay(1500);
+    Udp.beginPacket("192.168.4.1",822);
+    Udp.write(WiFi.macAddress().c_str());
+    Udp.endPacket();//
+    delay(1500);
+    Udp.parsePacket();
+    int input;
+    while(input != 4){//如果一直接收不到相应字节的就进入循环
+      input = Udp.parsePacket();//接收相应数据包
+      Udp.beginPacket("192.168.4.1",822);
+      Udp.write(WiFi.macAddress().c_str());
+      Udp.endPacket();//
+      delay(3000);
+    }
+    input = 0;
+    if(Udp.readString() = "pass"){
+      Serial.printf("测试成功");
+      count++;
+    }
+  }///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
+  /////////////////////////////////////UDP测试互发包//////////////////////////
+}
+ ////////////////////////////////////测试发送客户端IP地址////////////////////
+  //client.printf("A");
+  //if(count == 0){
+  //  WiFi.begin(ssid,password);
+  //  client.println(WiFi.localIP());
+  //  count++;
+  //}
+  //读取指令
+  //transfer ="";
+  //client.printf(".");
+//STA连接wifi回调函数
+void connectHelper(const WiFiEventStationModeConnected &event){
+  Serial.printf("\n\n已连接至 %s ！\n",ssid);
+  digitalWrite(D4,HIGH);
+  count = 0;//恢复设置，重新开始计数
+}
+//STA断开wifi回调函数
+void disconnectHelper(const WiFiEventStationModeDisconnected &event){
+  //报告状况
+  Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
+  digitalWrite(D4,LOW);
+  
+  //linkserverFunction();
+}
+/*
+client.connect(host,port);
   Serial.printf("\n正在TCP连接IP：");
   Serial.println(host);
   if (!client.connect(host,port)){
@@ -151,35 +228,4 @@ void setup() {
 void IPfunction(){
   Serial.printf("\n目前ip地址为： ");
   Serial.println(WiFi.localIP());
-}
-String transfer;
-void loop() {
- ////////////////////////////////////测试发送客户端IP地址////////////////////
-  //client.printf("A");
-  //if(count == 0){
-  //  WiFi.begin(ssid,password);
-  //  client.println(WiFi.localIP());
-  //  count++;
-  //}
-  //读取指令
-  transfer = client.readStringUntil('\n');
-  if(transfer == "dream"){
-    client.printf("sky\n");
-  }
-  Serial.println(transfer);
-  //transfer ="";
-  //client.printf(".");
-}
-//STA连接wifi回调函数
-void connectHelper(const WiFiEventStationModeConnected &event){
-  Serial.printf("\n\n已连接至 %s ！\n",ssid);
-  digitalWrite(D4,HIGH);
-}
-//STA断开wifi回调函数
-void disconnectHelper(const WiFiEventStationModeDisconnected &event){
-  //报告状况
-  Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
-  digitalWrite(D4,LOW);
-  count = 0;
-  //linkserverFunction();
-}
+  */
