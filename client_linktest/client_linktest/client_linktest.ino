@@ -13,6 +13,10 @@ dreamsky.0822.wuming
 **********************************************************************************
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
+int Numconnect = 0;//重新计算链接次数，用于判断是否进行UDP测试互发包
+int Numcount = 0;//用于记录判断是否是重连还是正常连接的数值
+int Numdisconnect = 0;//客户端设备掉线标识
+
 WiFiUDP Udp;//实例化UDP对象
 //定义网络TCP包传输端口
 const uint16_t port = 80;//AP模式的监听端口
@@ -156,31 +160,44 @@ void setup() {
     Serial.printf("开启失败！");
   }
 }
-int Numcount = 0;//重新计算链接次数，用于判断是否进行UDP测试互发包
-void loop() {
-  /////////////////////////////////////UDP测试互发包//////////////////////////
-  ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
-  if(Numcount == 0){
-    delay(1500);
-    Udp.beginPacket("192.168.4.1",822);
-    Udp.write(WiFi.macAddress().c_str());
-    Udp.endPacket();//
-    delay(1500);
-    Udp.parsePacket();
+//client客户端判断server服务端发起连接测试请求函数，如果收到1，则返回2(UDP)
+void respondCheckToserverUdp(){
+  //解包判断是否UDP包内的字符是否为“1”
+
+}
+
+//UDP测试收发包函数client端
+int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
+  if(Numconnectinsde == 0){
+    if(*Numcountinsde == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
+      delay(2000);
+    }
     int input;
     while(input != 4){//如果一直接收不到相应字节的就进入循环
       input = Udp.parsePacket();//接收相应数据包
       Udp.beginPacket("192.168.4.1",822);
       Udp.write(WiFi.macAddress().c_str());
       Udp.endPacket();//
-      delay(3000);
     }
-    input = 0;
     if(Udp.readString() = "pass"){
-      Serial.printf("UDP协议重连成功！");
-      Numcount++;
+      if(*Numcountinsde == 0){//针对不同情况下的输出语句
+        Serial.printf("UDP协议连接成功！");
+        *Numcountinsde = 1;
+      }else {
+        Serial.printf("UDP协议重连成功！");
+      }
+      Numconnectinsde++;
     }
-  }///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
+  }
+  return Numconnectinsde;
+}
+
+void loop() {
+  /////////////////////////////////////UDP测试互发包//////////////////////////
+  ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
+  Numconnect = checklinkUDPclient(&Numcount,Numconnect);
+  
+  ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
  ////////////////////////////////////测试发送客户端IP地址////////////////////
@@ -203,7 +220,7 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   //报告状况
   Serial.printf("\nWIFI目前已断开！\n正在重新连接\n正在连接到%s",ssid);
   digitalWrite(D4,LOW);
-  Numcount = 0;//恢复设置，重新开始计数
+  Numconnect = 0;//恢复设置，重新开始计数
   //linkserverFunction();
 }
 /*
