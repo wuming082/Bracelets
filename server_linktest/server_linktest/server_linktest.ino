@@ -14,6 +14,10 @@ dreamsky.0822.wuming
 用于测试开发板的WIFI调试程序以及基础的框架程序测试
 */
 WiFiUDP Udp;//实例化UDP对象
+//记录设备连接状况
+IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
+int Numcount = 0;//用于是否开启握手协议检测
+int Numdisconnect = 0;//客户端设备掉线标识
 
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
@@ -75,7 +79,7 @@ class APWIFI{//默认情况下为隐藏式WIFI
 //注册网络设备接入连接事件处理程序1
 WiFiEventHandler APlinkfunction;
 //注册有连接点断开的处理程序
-WiFiEventHandler stationDisconnectedHandler;
+//WiFiEventHandler stationDisconnectedHandler;
 //AP和STA模式切换函数//默认为STA模式
 class switchTrans {
   //创建默认模式切换方法
@@ -128,7 +132,7 @@ void setup() {
   Serial.begin(115200);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
-  stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
+  //stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
   //APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
   //test
   //STA模式开启
@@ -155,12 +159,81 @@ void setup() {
   //检测机制////////////////////////////////
   //检测是否为相应mac地址的设备加入
 }
+//UDP测试收发包函数server端
+//记录发送方的ip地址
+int checklinkUDPserver(int Numcount){
+  if(Numcount == 0){
+    int input;
+    while(input != 17){//等待数据包发送到目标设备
+      input = Udp.parsePacket();
+    }
+    ///////////////////MAC写入内存，用于后续配对环节////////////////
+    ipsend = Udp.remoteIP();//记录目标设备
+    if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
+      Udp.beginPacket(ipsend,822);
+      Udp.write("pass");
+      Udp.endPacket();//
+      Numcount++;
+      Serial.printf("\nUDP连接成功！");
+    }
+  }
+  return Numcount;
+}
+//UDP测试收发包函数client端
+int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
+  if(Numconnectinsde == 0){
+    if(*Numcountinsde == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
+      delay(2000);
+    }
+    int input;
+    while(input != 4){//如果一直接收不到相应字节的就进入循环
+      input = Udp.parsePacket();//接收相应数据包
+      Udp.beginPacket("192.168.4.1",822);
+      Udp.write(WiFi.macAddress().c_str());
+      Udp.endPacket();//
+    }
+    if(Udp.readString() = "pass"){
+      if(*Numcountinsde == 0){//针对不同情况下的输出语句
+        Serial.printf("UDP协议连接成功！");
+        *Numcountinsde = 1;
+      }else {
+        Serial.printf("UDP协议重连成功！");
+      }
+      Numconnectinsde++;
+    }
+  }
+  return Numconnectinsde;
+}
+//传输震动指令核心代码块函数///////////////////////////////////////
+//测试目标客户端是否在线函数
+void checklinkToclientUdp(){//发送1如果收到2则表示连接测试成功30秒内(UDP)
+  //发送到已配对目标客户端IPsend
+  Udp.beginPacket(ipsend,822);
+  Udp.write("1");
+  Udp.endPacket();//发送1数据包
+  int input;
+  int count = 0;//记录循环次数1000毫秒为单位
+  while(input != 1){
+    input = Udp.parsePacket();
+    delay(1000);
+    count++;
+    if(count == 30){//在30秒内如果没有回应，直接退出并且识别为设备断开
+      Numdisconnect++;//标识设备已断连
+      return;
+    }
+  }
+  if(Udp.readString() == "2"){
+    Serial.printf("\n测试成功，目前状态为连接");
+  }else{
+    Serial.printf("\n与目标值不符，断连");
+    Numdisconnect++;//标识设备已断连
+  }  
+}
 //记录设备连接状况
-int Numcount = 0;
 void loop() {
-  int packetSize = Udp.parsePacket();//获得解析包
-  if (packetSize && Udp.readString() == "84:CC:A8:9E:E4:C8")//解析包不为空且解析包不能单独发送MAC码
-  {
+  //int packetSize = Udp.parsePacket();//获得解析包
+  //if (packetSize && Udp.readString() == "84:CC:A8:9E:E4:C8")//解析包不为空且解析包不能单独发送MAC码
+  //{
     //收到Udp数据包
     //Udp.remoteIP().toString().c_str()用于将获取的远端IP地址转化为字符串
     /*
@@ -173,10 +246,11 @@ void loop() {
       incomingPacket[len] = 0;//清空缓存
     }
     */
-    Serial.printf("\ntest");
+    //Serial.printf("\ntest");
     //向串口打印信息
     //Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
- 
+  Numcount = checklinkUDPserver(Numcount);
+  //checklinkToclient();
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
   //WiFiClient client = server.available();//监听客户端连接
   //判断用户有没有进行输入
@@ -190,21 +264,9 @@ void loop() {
       }
     }
     */
-  }
+  //}
   /////////////////////////////////////UDP测试互发包//////////////////////////
-  if(Numcount == 0){
-    Udp.parsePacket();
-    if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
-      Serial.printf("true");
-      delay(2000);
-      Udp.beginPacket("192.168.4.2",822);
-      char  replyPacket[] = "pass";
-      Udp.write(replyPacket);
-      Udp.endPacket();//
-      Numcount++;
-      Serial.printf("\nUDP连接成功！");
-    }
-  }
+  
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
 /*
@@ -247,11 +309,13 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   digitalWrite(D4,LOW);
   //linkserverFunction();
 }
+/*
 void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt){
   //链接丢失提醒
   Serial.printf("\n目标链接丢失！");
   Numcount--;
 }
+*/
 //ap模式有新的设备加入
 /*
 void APlinkHelper(const WiFiEventSoftAPModeStationConnected& event){
