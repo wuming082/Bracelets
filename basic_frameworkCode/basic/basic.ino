@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
+#include <WiFiUdp.h>
 #define ssid "Texthome"//目标名称
 #define password "WZP8460121"//密码
 /*
@@ -99,10 +100,78 @@ class switchTrans {
     }
   }
 };
-
+/*
+//UDP协议开启以及查看测试连接类
+class UDPclass{
+  public: static int openUPD(){//开启UDP
+    WiFiUDP Udp;//实例化UDP对象
+    //设置监听端口
+    unsigned int localUdpPort = 822;
+    //开启UDP监听端口
+    if(Udp.begin(localUdpPort)){
+      Serial.println("UDP协议监听端口开启成功！");
+      Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.localIP().toString().c_str());
+    }else{
+      Serial.printf("开启失败！");
+    }
+  }
+  public: static bool lanchUDPpackage(String IPAdress,unsigned int port,String massage){
+    WiFiUDP Udp;//实例化UDP对象
+    Udp.beginPacket(IPAdress,port);//配置目的地
+    Udp.write(massage);//写入udp数据包
+    if(Udp.endPacket()){//发送数据包
+      Serial.printf("\n发送成功");
+    }else{
+      Serial.printf("\n发送失败");
+    }
+  }
+};
+*/
 //串口程序函数4
 //目标设备丢失事件处理程序（需要通过MAC地址判断是否为目标设备）
-
+//UDP测试收发包函数server端
+int checklinkUDPserver(int Numcount){//Numconut用于记录设备是否为断连后的状态，如果为断连后的状态，则开始测试重连
+  if(Numcount == 0){
+    int input;
+    while(input != 17){//等待数据包发送到目标设备
+      input = Udp.parsePacket();
+    }
+    if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
+      Udp.beginPacket("192.168.4.2",822);
+      char  replyPacket[] = "pass";
+      Udp.write(replyPacket);
+      Udp.endPacket();//
+      Numcount++;
+      Serial.printf("\nUDP连接成功！");
+    }
+  }
+  return Numcount;
+}
+//UDP测试收发包函数client端
+int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
+  if(Numconnectinsde == 0){
+    if(*Numcountinsde == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
+      delay(2000);
+    }
+    int input;
+    while(input != 4){//如果一直接收不到相应字节的就进入循环
+      input = Udp.parsePacket();//接收相应数据包
+      Udp.beginPacket("192.168.4.1",822);
+      Udp.write(WiFi.macAddress().c_str());
+      Udp.endPacket();//
+    }
+    if(Udp.readString() = "pass"){
+      if(*Numcountinsde == 0){//针对不同情况下的输出语句
+        Serial.printf("UDP协议连接成功！");
+        *Numcountinsde = 1;
+      }else {
+        Serial.printf("UDP协议重连成功！");
+      }
+      Numconnectinsde++;
+    }
+  }
+  return Numconnectinsde;
+}
 void setup() {
   pinMode(D4,OUTPUT);
   digitalWrite(D4,HIGH);
