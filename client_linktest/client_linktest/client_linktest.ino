@@ -163,7 +163,14 @@ void setup() {
 //client客户端判断server服务端发起连接测试请求函数，如果收到1，则返回2(UDP)
 void respondCheckToserverUdp(){
   //解包判断是否UDP包内的字符是否为“1”
-
+  int input;//创建判断是否为测试连接包变量
+  input = Udp.parsePacket();
+  if(input = 1 && Udp.readString() == "1"){
+    Udp.beginPacket(Udp.remoteIP(),822);//回送目标设备
+    Udp.write("2");
+    Udp.endPacket();//
+    Serial.printf("\n已发送");
+  }
 }
 
 //UDP测试收发包函数client端
@@ -191,12 +198,11 @@ int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
   }
   return Numconnectinsde;
 }
-
 void loop() {
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
   Numconnect = checklinkUDPclient(&Numcount,Numconnect);
-  
+  respondCheckToserverUdp();
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
