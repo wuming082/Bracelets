@@ -16,7 +16,6 @@ dreamsky.0822.wuming
 WiFiUDP Udp;//实例化UDP对象
 //记录设备连接状况
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
-int Numcount = 0;//用于是否开启握手协议检测
 int Numdisconnect = 0;//客户端设备掉线标识
 
 ////////////////////////////////////////////Test///////////////////
@@ -161,8 +160,8 @@ void setup() {
 }
 //UDP测试收发包函数server端
 //记录发送方的ip地址
-int checklinkUDPserver(int Numcount){
-  if(Numcount == 0){
+int checklinkUDPserver(int Numcountinsde){
+  if(Numcountinsde == 1){
     int input;
     while(input != 17){//等待数据包发送到目标设备
       input = Udp.parsePacket();
@@ -173,11 +172,11 @@ int checklinkUDPserver(int Numcount){
       Udp.beginPacket(ipsend,822);
       Udp.write("pass");
       Udp.endPacket();//
-      Numcount++;
+      Numcountinsde = 0;
       Serial.printf("\nUDP连接成功！");
     }
   }
-  return Numcount;
+  return Numcountinsde;
 }
 //UDP测试收发包函数client端
 int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
@@ -206,7 +205,7 @@ int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
 }
 //传输震动指令核心代码块函数///////////////////////////////////////
 //测试目标客户端是否在线函数
-void checklinkToclientUdp(){//发送1如果收到2则表示连接测试成功30秒内(UDP)
+void checklinkToclientUdp(){//发送1如果收到2则表示连接测试成功10秒内(UDP)
   //发送到已配对目标客户端IPsend
   Udp.beginPacket(ipsend,822);
   Udp.write("1");
@@ -217,8 +216,9 @@ void checklinkToclientUdp(){//发送1如果收到2则表示连接测试成功30�
     input = Udp.parsePacket();
     delay(1000);
     count++;
-    if(count == 30){//在30秒内如果没有回应，直接退出并且识别为设备断开
+    if(count == 8){//在10秒内如果没有回应，直接退出并且识别为设备断开
       Numdisconnect++;//标识设备已断连
+      Serial.printf("\n设备连接超时！");
       return;
     }
   }
@@ -249,7 +249,8 @@ void loop() {
     //Serial.printf("\ntest");
     //向串口打印信息
     //Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
-  Numcount = checklinkUDPserver(Numcount);
+  checklinkToclientUdp();
+  Numdisconnect = checklinkUDPserver(Numdisconnect);
   //checklinkToclient();
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
   //WiFiClient client = server.available();//监听客户端连接
