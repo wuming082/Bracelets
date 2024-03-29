@@ -203,6 +203,7 @@ void loop() {
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
   Numconnect = checklinkUDPclient(&Numcount,Numconnect);
   respondCheckToserverUdp();
+  
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
