@@ -17,6 +17,7 @@ WiFiUDP Udp;//实例化UDP对象
 //记录设备连接状况
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
 int Numdisconnect = 0;//客户端设备掉线标识 为0时表示断连，1时表示连接正常
+int Numcount = 0;//记录设备连接情况 为0则表示无客户端连接
 
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
@@ -129,13 +130,14 @@ class UDPSR{
     Udp.write(message.c_str());//将发送的message打包
     Udp.endPacket();
   }
+  //查看是否符合目标内容方法//专为传入单个数字所使用的方法//待修复
   static bool Udpreceive(String AttestationMessage){//AttestationMessage为接受包内容是否与AttestationMessage相同
     int input,count;//count为计时器变量
-    while(input != sizeof(AttestationMessage) - 1){//接收时限10秒
+    while(input != 1){//接收时限10秒
       input = Udp.parsePacket();//持续检测接受包，并查看信息字符串大小
       delay(1000);
       count++;
-      if(count == 10){
+      if(count == 6){
         Serial.printf("Udpreceive_err接收超时！");
         return false;
       }
@@ -185,8 +187,8 @@ void setup() {
 }
 //UDP测试收发包函数server端
 //记录发送方的ip地址
-int checklinkUDPserver(int Numcountinsde){
-  if(Numcountinsde == 0){
+void checklinkUDPserver(){
+  if(Numcount == 0){
     int input;
     while(input != 17){//等待数据包发送到目标设备
       input = Udp.parsePacket();
@@ -197,11 +199,10 @@ int checklinkUDPserver(int Numcountinsde){
       Udp.beginPacket(ipsend,822);
       Udp.write("pass");
       Udp.endPacket();//
-      Numcountinsde = 1;
+      Numcount = 1;
       Serial.printf("\nUDP连接成功！");
     }
   }
-  return Numcountinsde;
 }
 //UDP测试收发包函数client端
 int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
@@ -231,7 +232,7 @@ int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
 
 //测试目标客户端是否在线类
 class Check{
-  //影响设备整体操控(无参)
+  //影响设备整体进程(无参)
   public: static void checklinkToclientUdp(){//发送1如果收到2则表示连接测试成功10秒内(UDP)
     //发送到已配对目标客户端IPsend
     Udp.beginPacket(ipsend,822);
@@ -243,8 +244,8 @@ class Check{
       input = Udp.parsePacket();
       delay(1000);
       count++;
-      if(count == 8){//在10秒内如果没有回应，直接退出并且识别为设备断开
-        Numdisconnect = 0;//标识设备已断连
+      if(count == 10){//在10秒内如果没有回应，直接退出并且识别为设备断开
+        Numcount = 0;//标记设备丢失
         Serial.printf("\n设备连接超时！");
         return;
       }
@@ -252,10 +253,9 @@ class Check{
     if(Udp.readString() == "2"){
       Serial.printf("\n测试成功，目前状态为连接\n目标ip地址为");
       Serial.println(Udp.remoteIP());
-      Numdisconnect = 1;
    }else{
       Serial.printf("\n与目标值不符，断连");
-      Numdisconnect = 0;//标识设备已断连
+      Numcount = 0;//标记设备丢失
    }  
   }
   ///////////////////////////////UDP超时检测包封装类Test///////////////////////////////
@@ -288,7 +288,7 @@ bool sendToclientMoveHelper(int option){//option为从手腕正上方顺时针�
   //测试代码
   if(option <= 7 && option >= 0){//由0-7定义
     //进入发送指令环节
-    UDPSR::Udpsend(ipsend,(String)option);
+    UDPSR::Udpsend(ipsend,"0"+(String)option);
     if(UDPSR::Udpreceive((String)option)){
       //发送成功
       Serial.printf("发送成功");
@@ -304,39 +304,32 @@ bool sendToclientMove(int option){
   //检测目标设备是否存在
   if(Check::checklinkToclientUdp(1)){
     //进行发送震动命令
-    if(sendToclientMoveHelper(1)){//震动第二颗马达
+    if(sendToclientMoveHelper(option)){//震动第二颗马达
       return true;
     }else{
       return false;
+      Serial.printf("\nsendToclientMove_err");
     }
   }else{
     Serial.printf("检测到设备未连接，发送指令错误！");
+    Numcount = 0;//标记设备丢失
     return false;
   }
 }
 ///////////////////////////////发送震动指令Test////////////////////////////////////////////////////////////////
 //记录设备连接状况
+int newB = 0;
 void loop() {
-  //int packetSize = Udp.parsePacket();//获得解析包
-  //if (packetSize && Udp.readString() == "84:CC:A8:9E:E4:C8")//解析包不为空且解析包不能单独发送MAC码
-  //{
-    //收到Udp数据包
-    //Udp.remoteIP().toString().c_str()用于将获取的远端IP地址转化为字符串
-    /*
-    Serial.printf("收到来自远程IP：%s（远程端口：%d）的数据包字节数：%d\n", Udp.remoteIP().toString().c_str(), Udp.remotePort(), packetSize);
-    char incomingPacket[255];
-    // 读取Udp数据包并存放在incomingPacket
-    int len = Udp.read(incomingPacket, 255);//返回数据包字节数
-    if (len > 0)
-    { 
-      incomingPacket[len] = 0;//清空缓存
-    }
-    */
-    //Serial.printf("\ntest");
-    //向串口打印信息
-    //Serial.printf("UDP数据包内容为: %s\n", incomingPacket);
-  Check::checklinkToclientUdp();//检测时效性
-  Numdisconnect = checklinkUDPserver(Numdisconnect);//UDP认证包
+  /*
+  if(Serial.available()){           // 当串口接收到信息后 
+    newB = Serial.read();    // 将接收到的信息使用read读取
+    newB = newB - 48;
+  }
+  */
+
+  checklinkUDPserver();//UDP认证包
+  //发送震动指令
+  
   //checklinkToclient();
   //////////////////////与客户端进行TCP握手连接////////////////////////////////////////
   //WiFiClient client = server.available();//监听客户端连接
@@ -411,3 +404,4 @@ void APlinkHelper(const WiFiEventSoftAPModeStationConnected& event){
   Serial.println(WiFi.softAPIP());
 }
 */
+
