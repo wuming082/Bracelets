@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
+#include<stdlib.h>
 #include <WiFiUdp.h>
 
 #define ssid "Testhome"//目标名称
@@ -16,6 +17,7 @@ dreamsky.0822.wuming
 int Numconnect = 0;//重新计算链接次数，用于判断是否进行UDP测试互发包
 int Numcount = 0;//用于记录判断是否是重连还是正常连接的数值
 int Numdisconnect = 0;//客户端设备掉线标识
+IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
 
 WiFiUDP Udp;//实例化UDP对象
 //定义网络TCP包传输端口
@@ -122,6 +124,37 @@ class switchTrans {
     }
   }
 };
+class UDPSR{
+  public:
+  static void Udpsend(IPAddress ipdes,String message){
+    Udp.beginPacket(ipdes,822);//测试
+    Udp.write(message.c_str());//将发送的message打包
+    Udp.endPacket();
+  }
+  static bool Udpreceive(String AttestationMessage){//AttestationMessage为接受包内容是否与AttestationMessage相同
+    int input,count;//count为计时器变量
+    while(input != sizeof(AttestationMessage) - 1){//接收时限10秒
+      input = Udp.parsePacket();//持续检测接受包，并查看信息字符串大小
+      delay(1000);
+      count++;
+      if(count == 10){
+        Serial.printf("Udpreceive_err接收超时！");
+        return false;
+      }
+    }
+    if(Udp.readString() == AttestationMessage){
+      Serial.printf("Udpreceive接收到相应数据包");
+      return true;
+    }
+  }
+  static String Udpreceive(){//直接返回读取到的包内内容，类型为String类
+    delay(1000);
+    Udp.parsePacket();
+    String transfer = Udp.readString();
+    Serial.printf("读取到的内容为 %s",transfer);
+    return transfer;
+  }
+};
 //发送检测数据包.检测函数
 int checkpakeage(){/////////////////////////err////////////////////////
   Udp.beginPacket("192.168.4.1",822);
@@ -163,9 +196,7 @@ void setup() {
 //client客户端判断server服务端发起连接测试请求函数，如果收到1，则返回2(UDP)
 void respondCheckToserverUdp(){
   //解包判断是否UDP包内的字符是否为“1”
-  int input;//创建判断是否为测试连接包变量
-  input = Udp.parsePacket();
-  if(input = 1 && Udp.readString() == "1"){
+  if(Udp.readString() == "1"){
     Udp.beginPacket(Udp.remoteIP(),822);//回送目标设备
     Udp.write("2");
     Udp.endPacket();//
@@ -174,36 +205,68 @@ void respondCheckToserverUdp(){
 }
 
 //UDP测试收发包函数client端
-int checklinkUDPclient(int *Numcountinsde,int Numconnectinsde){
-  if(Numconnectinsde == 0){
-    if(*Numcountinsde == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
+void checklinkUDPclient(){
+  if(Numconnect == 0){
+    if(Numcount == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
       delay(2000);
     }
     int input;
     while(input != 4){//如果一直接收不到相应字节的就进入循环
-      input = Udp.parsePacket();//接收相应数据包
-      Udp.beginPacket("192.168.4.1",822);
+      input = Udp.parsePacket();//
+      ipsend = Udp.remoteIP();
+      Udp.beginPacket(Udp.remoteIP(),822);
       Udp.write(WiFi.macAddress().c_str());
       Udp.endPacket();//
     }
     if(Udp.readString() = "pass"){
-      if(*Numcountinsde == 0){//针对不同情况下的输出语句
+      if(Numcount == 0){//针对不同情况下的输出语句
         Serial.printf("UDP协议连接成功！");
-        *Numcountinsde = 1;
+        Numcount = 1;
       }else {
         Serial.printf("UDP协议重连成功！");
       }
-      Numconnectinsde++;
+      Numconnect++;
     }
   }
-  return Numconnectinsde;
+}
+//字符转换成相应的数字
+int transferChar(int input){
+  return input - 48;
+}
+//接收震动执行命令包类
+class recive{
+  public:
+  static void reciveToserverMove(){//接收目标服务端发送的震动数据包
+    String transfer = Udp.readString();
+    int input = transferChar(transfer[1]);//字符串转换，用于控制相应顺序马达
+    Serial.printf("\n%d\n",input);
+    UDPSR::Udpsend(Udp.remoteIP(),(String)input);
+    lightLEDinf(1);
+  }
+};
+//通过服务端的数据包的字节长度大小从而判断进入哪一个模块
+void selectMode(){
+  if(Numconnect == 1){//为正常连接模式，进入接收数据包指令当中
+    int input = Udp.parsePacket();
+    switch(input){
+      case 1:
+        //为接收到超时检测数据包
+        respondCheckToserverUdp();
+        break;
+      case 2:
+        //数据包字节长度为2,进入接收震动指令模式
+        recive::reciveToserverMove();
+        break;
+    }
+  }else{//Numconnect显示为目前为未认证状态，进入UDP认证模式
+    checklinkUDPclient();
+  }
 }
 void loop() {
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
-  Numconnect = checklinkUDPclient(&Numcount,Numconnect);
-  respondCheckToserverUdp();
-  
+  //Numconnect = checklinkUDPclient(&Numcount,Numconnect);
+  selectMode();
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
