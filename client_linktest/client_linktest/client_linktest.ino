@@ -184,7 +184,6 @@ void setup() {
   //STA模式开启
   switchTrans::switchMode();
   //设置监听端口
-  
   //开启UDP监听端口
   if(Udp.begin(localUdpPort)){
     Serial.println("UDP协议监听端口开启成功！");
@@ -207,6 +206,7 @@ void respondCheckToserverUdp(){
 //UDP测试收发包函数client端
 void checklinkUDPclient(){
   if(Numconnect == 0){
+    delay(200);
     if(Numcount == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
       delay(2000);
     }
@@ -240,7 +240,7 @@ class recive{
     String transfer = Udp.readString();
     int input = transferChar(transfer[1]);//字符串转换，用于控制相应顺序马达
     Serial.printf("\n%d\n",input);
-    UDPSR::Udpsend(Udp.remoteIP(),(String)input);
+    //UDPSR::Udpsend(Udp.remoteIP(),(String)input);
     lightLEDinf(1);
   }
 };
