@@ -2,6 +2,7 @@
 #include<stdio.h>
 #include <Pinger.h>
 #include <WiFiUdp.h>
+#include <espnow.h>
 
 #define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
@@ -79,7 +80,7 @@ class APWIFI{//默认情况下为隐藏式WIFI
 //注册网络设备接入连接事件处理程序1
 WiFiEventHandler APlinkfunction;
 //注册有连接点断开的处理程序
-//WiFiEventHandler stationDisconnectedHandler;
+WiFiEventHandler stationDisconnectedHandler;
 //AP和STA模式切换函数//默认为STA模式
 class switchTrans {
   //创建默认模式切换方法
@@ -158,7 +159,7 @@ void setup() {
   Serial.begin(115200);
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
-  //stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
+  stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
   //APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
   //test
   //STA模式开启
@@ -289,11 +290,15 @@ bool sendToclientMoveHelper(int option){//option为从手腕正上方顺时针�
   if(option <= 7 && option >= 0){//由0-7定义
     //进入发送指令环节
     UDPSR::Udpsend(ipsend,"0"+(String)option);
+    //Serial.printf("1");
+    /*
     if(UDPSR::Udpreceive((String)option)){
       //发送成功
       Serial.printf("发送成功");
       return true;
     }
+    */
+    return true;
   }else{
     Serial.printf("sendToclientMoveHelper(int option)_err传参错误！\n option的传参应在[0-7]，请检查传入参数");
     return false;//发送错误
@@ -301,10 +306,12 @@ bool sendToclientMoveHelper(int option){//option为从手腕正上方顺时针�
 }
 //传输震动指令核心代码块函数
 bool sendToclientMove(int option){
+  sendToclientMoveHelper(option);
+  /*
   //检测目标设备是否存在
   if(Check::checklinkToclientUdp(1)){
     //进行发送震动命令
-    if(sendToclientMoveHelper(option)){//震动第二颗马达
+    if(){//震动第二颗马达
       return true;
     }else{
       return false;
@@ -315,10 +322,11 @@ bool sendToclientMove(int option){
     Numcount = 0;//标记设备丢失
     return false;
   }
+  */
 }
 ///////////////////////////////发送震动指令Test////////////////////////////////////////////////////////////////
 //记录设备连接状况
-int newB = 0;
+int Seccount = 0;
 void loop() {
   /*
   if(Serial.available()){           // 当串口接收到信息后 
@@ -326,8 +334,14 @@ void loop() {
     newB = newB - 48;
   }
   */
-
-  checklinkUDPserver();//UDP认证包
+  checklinkUDPserver();
+  //nano板串口测试程序
+  while (Serial.available()){           // 当串口接收到信息后 
+    int serialData = Serial.read();    // 将接收到的信息使用read读取
+    Serial.printf("%d",serialData - 48);
+    sendToclientMove(serialData - 48);
+  }
+  //checklinkUDPserver();//UDP认证包
   //发送震动指令
   
   //checklinkToclient();
@@ -389,13 +403,13 @@ void disconnectHelper(const WiFiEventStationModeDisconnected &event){
   digitalWrite(D4,LOW);
   //linkserverFunction();
 }
-/*
+
 void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt){
   //链接丢失提醒
   Serial.printf("\n目标链接丢失！");
-  Numcount--;
+  Numcount = 0;
 }
-*/
+
 //ap模式有新的设备加入
 /*
 void APlinkHelper(const WiFiEventSoftAPModeStationConnected& event){
