@@ -19,6 +19,7 @@ WiFiUDP Udp;//实例化UDP对象
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
 int Numdisconnect = 0;//客户端设备掉线标识 为0时表示断连，1时表示连接正常
 int Numcount = 0;//记录设备连接情况 为0则表示无客户端连接
+uint8_t broadcasrAddress[] = {0x84, 0xCC, 0xA8, 0x9E, 0xE4, 0xC8};//定义从端物理位置
 
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
@@ -50,6 +51,35 @@ void lightLEDinf(int option){//传入1为正常情况快三闪，传入0为发�
   }
   else
     Serial.println("\nlightLEDinf(option)_err,传参错误，1为正常三闪，0为错误四闪，请查看参数是否合规");
+}
+//ESP-NOW协议框架/////////////////////////////////
+//esp-now初始化函数
+void initializationserver (){
+  if(esp_now_init() != 0){//开始espnow协议
+    Serial.println("Erresp");
+    return;
+  }
+}
+//初始化设置函数
+void initializationConfigServer(){
+  esp_now_register_send_cb(OnDataSent);//注册回调函数，发送数据后
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);//注册身份信息（主端）
+  esp_now_add_peer(broadcasrAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);//注册
+}
+//espnow回调函数/主端
+void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("发送状态为:");
+  if (sendStatus == 0){
+    Serial.println("发送成功！");
+  }
+  else{
+    Serial.println("发送失败！\n正在查找原因！");
+    //超时包检测
+  }
+}
+//espnow发送函数
+void espnowSendInt(int data){//专门发送整形定义函数
+  esp_now_send(broadcasrAddress, (uint8_t *) &data, sizeof(data));//espnow协议发送函数
 }
 //连接wifi函数
 void linkserverFunction(){
@@ -160,21 +190,7 @@ void setup() {
   STAconnect = WiFi.onStationModeConnected(connectHelper);//connectHelper为连接到wifi后的回调函数
   STAdiconnect = WiFi.onStationModeDisconnected(disconnectHelper);//disconnectHelper为断开WIFI后的回调函数
   stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(onStationDisconnected);//客户端断开连接处理程序
-  //APlinkfunction = WiFi.onSoftAPModeStationConnected(APlinkHelper);//APlinkHelper为有新的客户端接入后的调用函数
-  //test
-  //STA模式开启
   switchTrans::switchMode(1,1);
-  //开启TCP服务器
-  //server.begin();
-  //Serial.println("\nserver_start");
-  //检测端口
-  //Serial.printf("端口为：%d\n",80);
-  //Serial.println(WiFi.softAPIP());
-  //test
-  //switchTrans::switchMode(1,1);
-  //test
-  //Serial.println("等待设备加入");
-  //设置监听端口
   unsigned int localUdpPort = 822;
   //开启UDP监听端口
   if(Udp.begin(localUdpPort)){
@@ -183,7 +199,9 @@ void setup() {
   }else{
     Serial.printf("开启失败！");
   }
-  //检测机制
+  initializationserver();//初始化espnow协议
+  initializationConfigServer();//初始化设置
+
   //检测是否为相应mac地址的设备加入
 }
 //UDP测试收发包函数server端
@@ -304,9 +322,13 @@ bool sendToclientMoveHelper(int option){//option为从手腕正上方顺时针�
     return false;//发送错误
   }
 }
-//传输震动指令核心代码块函数
-bool sendToclientMove(int option){
-  sendToclientMoveHelper(option);
+//传输震动指令核心代码块函数////////////////////////////
+void sendToclientMove(int option){//option应在0-7之间
+  if(option >= 0 && option <= 20){//进入正常传递过程
+    espnowSendInt(option);//发送数据
+  }else{//超过定义范围，越界访问
+    Serial.printf("sendToclientMove(int option)_err，option传参错误，请查看相应参数定义");
+  }
   /*
   //检测目标设备是否存在
   if(Check::checklinkToclientUdp(1)){
@@ -325,21 +347,21 @@ bool sendToclientMove(int option){
   */
 }
 ///////////////////////////////发送震动指令Test////////////////////////////////////////////////////////////////
-//记录设备连接状况
-int Seccount = 0;
+
 void loop() {
   /*
   if(Serial.available()){           // 当串口接收到信息后 
     newB = Serial.read();    // 将接收到的信息使用read读取
     newB = newB - 48;
   }
-  */
   checklinkUDPserver();
+  */
   //nano板串口测试程序
   while (Serial.available()){           // 当串口接收到信息后 
     int serialData = Serial.read();    // 将接收到的信息使用read读取
-    Serial.printf("%d",serialData - 48);
     sendToclientMove(serialData - 48);
+    delay(1000);//震动最小单位（单位ms4）
+    sendToclientMove(serialData - 48 + 10);
   }
   //checklinkUDPserver();//UDP认证包
   //发送震动指令

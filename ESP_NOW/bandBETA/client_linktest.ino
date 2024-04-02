@@ -2,6 +2,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include <WiFiUdp.h>
+#include<espnow.h>
 
 #define ssid "Testhome"//目标名称
 #define password "WZP8460121"//密码
@@ -18,7 +19,22 @@ int Numconnect = 0;//重新计算链接次数，用于判断是否进行UDP测�
 int Numcount = 0;//用于记录判断是否是重连还是正常连接的数值
 int Numdisconnect = 0;//客户端设备掉线标识
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
-
+int data;//定义用于接收的临时变量
+int MOTOR[8] = {D1,D2,D3,D4,D5,D6,D7,D8};
+void moTorinit(int nums[],int size){
+  for(int i = 0 ; i < size ; i++){
+    pinMode(nums[i],OUTPUT);//遍历初始化
+    digitalWrite(nums[i],LOW);//遍历初始化震动马达电位
+  }
+} 
+void moTorMove(int nums[],int option){//震动函数 
+  if(digitalRead(MOTOR[option]) == LOW){
+    digitalWrite(MOTOR[option],HIGH);
+  }else{
+    digitalWrite(MOTOR[option],LOW);
+  }
+  
+}
 WiFiUDP Udp;//实例化UDP对象
 //定义网络TCP包传输端口
 const uint16_t port = 80;//AP模式的监听端口
@@ -56,6 +72,30 @@ void lightLEDinf(int option){//传入1为正常情况快三闪，传入0为发�
   }
   else
     Serial.println("\nlightLEDinf(option)_err,传参错误，1为正常三闪，0为错误四闪，请查看参数是否合规");
+}
+
+//espnow协议函数框架////////////////////////////
+void initializationclient (){
+  if(esp_now_init() != 0){//开始espnow协议
+    Serial.println("Erresp");
+    return;
+  }
+}
+void initializationConfigclient(){
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);//定义此设备的对象
+  esp_now_register_recv_cb(OnDataRecv);//设置回调函数
+}
+//回调函数
+void OnDataRecv(uint8_t * mac, uint8_t *Recdata, uint8_t len) {
+  int data;
+  memcpy(&data, Recdata, sizeof(data));
+  if(data >= 10){
+    digitalWrite(MOTOR[data-10],LOW);//关闭马达信号
+  }else{
+    digitalWrite(MOTOR[data],HIGH);
+  }
+
+  
 }
 //连接wifi函数
 void linkserverFunction(){
@@ -191,6 +231,10 @@ void setup() {
   }else{
     Serial.printf("开启失败！");
   }
+  initializationclient ();//初始化espnow
+  initializationConfigclient();//定义espnow设备协议
+  moTorinit(MOTOR,sizeof(MOTOR)/sizeof(MOTOR[0]));
+
 }
 //client客户端判断server服务端发起连接测试请求函数，如果收到1，则返回2(UDP)
 void respondCheckToserverUdp(){
@@ -206,7 +250,7 @@ void respondCheckToserverUdp(){
 //UDP测试收发包函数client端
 void checklinkUDPclient(){
   if(Numconnect == 0){
-    delay(200);
+    delay(300);
     if(Numcount == 1){//缓冲，在断链后的一瞬间系统并不能读取MAC地址，进而导致死循环
       delay(2000);
     }
@@ -266,7 +310,6 @@ void loop() {
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
   //Numconnect = checklinkUDPclient(&Numcount,Numconnect);
-  selectMode();
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
 }
