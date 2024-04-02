@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include<stdio.h>
+#include<stdlib.h>
 #include <Pinger.h>
 #include <WiFiUdp.h>
 #include <espnow.h>
@@ -19,8 +20,8 @@ WiFiUDP Udp;//实例化UDP对象
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
 int Numdisconnect = 0;//客户端设备掉线标识 为0时表示断连，1时表示连接正常
 int Numcount = 0;//记录设备连接情况 为0则表示无客户端连接
-uint8_t broadcasrAddress[] = {0x84, 0xCC, 0xA8, 0x9E, 0xE4, 0xC8};//定义从端物理位置
-
+uint8_t broadcasrAddress[6];//定义从端物理位置
+String broadMAC;
 ////////////////////////////////////////////Test///////////////////
 //建立服务端TCP监听接口
 WiFiServer server(80);//监听接口为80
@@ -214,7 +215,12 @@ void checklinkUDPserver(){
     }
     ///////////////////MAC写入内存，用于后续配对环节////////////////
     ipsend = Udp.remoteIP();//记录目标设备
-    if(Udp.readString() == "84:CC:A8:9E:E4:C8"){
+    //将String类型MAC地址数据包转换成uint8_t类型的MAC地址数据包//////
+    String macAddr = Udp.readString();
+    char *macarr = (char*)macAddr.c_str();
+    ///////////////////////////////进行MAC数据包拆分，分配到6个数组当中/////////////
+    sscanf(macarr, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &broadcasrAddress[0], &broadcasrAddress[1], &broadcasrAddress[2], &broadcasrAddress[3], &broadcasrAddress[4], &broadcasrAddress[5]);
+    if(macAddr == "84:CC:A8:9E:E4:C8"){
       Udp.beginPacket(ipsend,822);
       Udp.write("pass");
       Udp.endPacket();//
@@ -356,6 +362,7 @@ void loop() {
   }
   checklinkUDPserver();
   */
+  checklinkUDPserver();
   //nano板串口测试程序
   while (Serial.available()){           // 当串口接收到信息后 
     int serialData = Serial.read();    // 将接收到的信息使用read读取

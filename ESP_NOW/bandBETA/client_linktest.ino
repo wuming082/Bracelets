@@ -89,13 +89,12 @@ void initializationConfigclient(){
 void OnDataRecv(uint8_t * mac, uint8_t *Recdata, uint8_t len) {
   int data;
   memcpy(&data, Recdata, sizeof(data));
+  Serial.println(data);
   if(data >= 10){
     digitalWrite(MOTOR[data-10],LOW);//关闭马达信号
   }else{
     digitalWrite(MOTOR[data],HIGH);
   }
-
-  
 }
 //连接wifi函数
 void linkserverFunction(){
@@ -264,7 +263,8 @@ void checklinkUDPclient(){
     }
     if(Udp.readString() = "pass"){
       if(Numcount == 0){//针对不同情况下的输出语句
-        Serial.printf("UDP协议连接成功！");
+        Serial.printf("UDP协议连接成功！\n");
+        Serial.printf("\nMAC地址已发送");
         Numcount = 1;
       }else {
         Serial.printf("UDP协议重连成功！");
@@ -307,6 +307,7 @@ void selectMode(){
   }
 }
 void loop() {
+  checklinkUDPclient();
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
   //Numconnect = checklinkUDPclient(&Numcount,Numconnect);
