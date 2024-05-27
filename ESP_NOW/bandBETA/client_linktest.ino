@@ -4,8 +4,8 @@
 #include <WiFiUdp.h>
 #include<espnow.h>
 
-#define ssid "Testhome"//目标名称
-#define password "WZP8460121"//密码
+#define ssid "dreamskyWX"//目标名称
+#define password "nanshan2017"//密码
 #define hostA "192.168.2.1"
 /*
 测试文件2024/3.23/10:27
@@ -20,7 +20,7 @@ int Numcount = 0;//用于记录判断是否是重连还是正常连接的数值
 int Numdisconnect = 0;//客户端设备掉线标识
 IPAddress ipsend;//发送方的IP地址，用于认证和回传目的
 int data;//定义用于接收的临时变量
-int MOTOR[8] = {D1,D2,D3,D4,D5,D6,D7,D8};
+int MOTOR[4] = {D1,D2,D6,D8};
 void moTorinit(int nums[],int size){
   for(int i = 0 ; i < size ; i++){
     pinMode(nums[i],OUTPUT);//遍历初始化
@@ -94,7 +94,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *Recdata, uint8_t len) {
     digitalWrite(MOTOR[data-10],LOW);//关闭马达信号
   }else{
     digitalWrite(MOTOR[data],HIGH);
-  }
+  }  
 }
 //连接wifi函数
 void linkserverFunction(){
@@ -228,12 +228,13 @@ void setup() {
     Serial.println("UDP协议监听端口开启成功！");
     Serial.printf("监听端口为：%d,本机IP为：%s\n",localUdpPort,WiFi.localIP().toString().c_str());
   }else{
-    Serial.printf("开启失败！");
+    Serial.printf("开启失败！");//8C:AA:B5:15:F7:D0
   }
   initializationclient ();//初始化espnow
   initializationConfigclient();//定义espnow设备协议
   moTorinit(MOTOR,sizeof(MOTOR)/sizeof(MOTOR[0]));
-
+  digitalWrite(D3,HIGH);
+  Serial.printf("字符串获取MAC地址: %s\n", WiFi.macAddress().c_str());
 }
 //client客户端判断server服务端发起连接测试请求函数，如果收到1，则返回2(UDP)
 void respondCheckToserverUdp(){
@@ -263,8 +264,7 @@ void checklinkUDPclient(){
     }
     if(Udp.readString() = "pass"){
       if(Numcount == 0){//针对不同情况下的输出语句
-        Serial.printf("UDP协议连接成功！\n");
-        Serial.printf("\nMAC地址已发送");
+        Serial.printf("UDP协议连接成功！");
         Numcount = 1;
       }else {
         Serial.printf("UDP协议重连成功！");
@@ -307,12 +307,12 @@ void selectMode(){
   }
 }
 void loop() {
-  checklinkUDPclient();
   /////////////////////////////////////UDP测试互发包//////////////////////////
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功////
   //Numconnect = checklinkUDPclient(&Numcount,Numconnect);
   ///////客户端发送MAC码，如果mac码服务端识别成功，服务端返回pass整体握手成功//
   /////////////////////////////////////UDP测试互发包//////////////////////////
+  selectMode();
 }
  ////////////////////////////////////测试发送客户端IP地址////////////////////
   //client.printf("A");
